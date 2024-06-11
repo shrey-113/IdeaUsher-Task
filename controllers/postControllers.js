@@ -36,34 +36,32 @@ const getPosts = async (req, res, next) => {
 
 const addPost = async (req, res, next) => {
   try {
-    const { title, desc, tags } = req.body;
+    const { title, desc, tags, category } = req.body;
     let imageUrl = "";
 
-    if (req.file) {
-      const params = {
-        Bucket: process.env.AWS_S3_BUCKET,
-        Key: req.file.filename,
-        Body: fs.createReadStream(req.file.path),
-        ContentType: req.file.mimetype,
-        ACL: "public-read",
-      };
-
-      const uploadResult = await s3.upload(params).promise();
-      imageUrl = uploadResult.Location;
+    if (req.file && req.file.cloudinaryUrl) {
+      imageUrl = req.file.cloudinaryUrl;
     }
 
-    const tagDocs = await Tag.find({ name: { $in: tags.split(",") } });
+    const tagNames = tags.split(",");
+    const tagDocs = await Tag.find({ name: { $in: tagNames } });
+
+    if (tagDocs.length !== tagNames.length) {
+      return res.status(400).json({ error: "One or more tags not found" });
+    }
 
     const post = new Post({
       title,
       desc,
       image: imageUrl,
       tags: tagDocs.map((tag) => tag._id),
+      category: category,
     });
 
     await post.save();
     res.status(201).json(post);
   } catch (error) {
+    console.error(error);
     res.status(400).json({ error: "BAD_REQUEST" });
   }
 };
